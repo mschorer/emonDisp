@@ -24,7 +24,7 @@ const int LED = 1;
 
 sStatus oem;
 const unsigned long DEFAULT_TIME = 1357041600;
-const uint8_t pipes[][6] = { "1emon", "2emon", "3emon", "4emon", "5emon", "6emon", };
+const uint8_t pipes[][6] = { "0emon", "1emon", "2emon", "3emon", "4emon", "5emon" };
 
 unsigned long tx_id=0;
 int dots = 40;
@@ -37,7 +37,7 @@ void setup() {
   
   oled.setCursor(0, 7);
 
-  oled.print("emon A #");
+  oled.print("emon C1 #");
   oled.print(sizeof( oem_power));
   oled.print("/");
   oled.print(sizeof( oem_energy));
@@ -64,15 +64,22 @@ void setup() {
   radio.setChannel(32);
   radio.setPALevel(RF24_PA_MAX);
   radio.setDataRate(RF24_250KBPS);
-  radio.setAutoAck(1);                     // Ensure autoACK is enabled
+  radio.setAutoAck( 1, 0);                     // Ensure autoACK is enabled
+  radio.setAutoAck( 2, 1);                     // Ensure autoACK is enabled
   radio.enableAckPayload();
 //  radio.enableDynamicPayloads();
 //  radio.setPayloadSize( sizeof( rx_packet));
-  radio.setRetries( 2, 10);                   // Optionally, increase the delay between retries & # of retries
+  radio.setRetries( 2, 5);                   // Optionally, increase the delay between retries & # of retries
   radio.setCRCLength(RF24_CRC_16); 
   
-  radio.openWritingPipe(pipes[0]);
-  radio.openReadingPipe(1, pipes[1]);
+  radio.openWritingPipe( pipes[1]);
+  
+  radio.openReadingPipe( 0, pipes[0]);
+  radio.openReadingPipe( 1, pipes[1]);
+  radio.openReadingPipe( 2, pipes[2]);
+  radio.openReadingPipe( 3, pipes[3]);
+  radio.openReadingPipe( 4, pipes[4]);
+  radio.openReadingPipe( 5, pipes[5]);
   
   radio.startListening();
   radio.printDetails();
@@ -98,6 +105,8 @@ void loop() {
   if ( radio.available( &pipe) || radio.isAckPayloadAvailable()){       
     psz = radio.getDynamicPayloadSize();
     radio.read( &rx_buffer, psz);
+    
+    updatePipe( pipe);
     
     switch( rx_buffer.packet_type) {
       case OEM_TIMESTAMP:
@@ -140,8 +149,10 @@ void loop() {
         Serial.println( "]");
     }
 
-    byte ack = OEM_NOP;
-    radio.writeAckPayload( pipe, &ack, 1);   
+    if ( pipe == 2) {
+      byte ack = OEM_NOP;
+      radio.writeAckPayload( pipe, &ack, 1);   
+    }
   } else {
     delay( 100);
   }
@@ -160,14 +171,23 @@ float conv( int val) {
   return val;  //((float) val) / 256.0;
 }
 
-void updateEnergy() {
+void updatePipe( uint8_t pno) {
     char s[20];
     oled.setFont(FONT6X8);
 
-    oled.setCursor(72, 0);  
+    oled.setCursor( 80, 0);  
+    sprintf( s, "#%d", pno);
+    oled.print( s);
+}
+
+void updateEnergy() {
+    char s[20];
+    oled.setFont(FONT6X8);
+/*
+    oled.setCursor(0, 0);  
     sprintf( s, "#%08ld", oem.energy.timestamp+oem.energy.duration);
     oled.print( s);
-
+*/
     oled.setCursor(60, 4);  
     sprintf( s, "%8ld Wh", oem.energy.wh_CT1);
     oled.print( s);     
@@ -193,12 +213,12 @@ void updateEnergy() {
 void updatePower() {
     char s[20];
     oled.setFont(FONT6X8);
-/*    
+    
     oled.setCursor(0, 0);  
-    sprintf( s, "#%06d", oem.power.timestamp);
+    sprintf( s, "#%ld", oem.power.timestamp);
     oled.print( s);
-*/
-    oled.setCursor( 22, 0);  
+
+    oled.setCursor( 100, 0);  
     sprintf( s, "%3dV", oem.power.voltage);
     oled.print( s);
 
